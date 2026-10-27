@@ -13,37 +13,37 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # تنظیم نسخه جاوا ۲۱ (الزامی برای نسخه‌های جدید گرادل و کپسیتر)
       - name: Setup Java (JDK 21)
         uses: actions/setup-java@v4
         with:
           distribution: 'zulu'
           java-version: '21'
 
-      # تنظیم محیط Node.js
       - name: Setup Node.js (v20)
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # آماده‌سازی و انتقال فایل‌های وب به پوشه www
+      # انتقال ایمن فایل‌ها بدون ایجاد لوپ در پوشه www
       - name: Prepare Web Assets
         run: |
-          mkdir -p www
+          mkdir -p staging_dir
           if ls *.zip 1> /dev/null 2>&1; then
             unzip -o *.zip -d temp_unzip
             if [ -f temp_unzip/index.html ]; then
-              cp -r temp_unzip/* www/
+              cp -r temp_unzip/* staging_dir/
             else
               SOURCE_DIR=$(find temp_unzip -name "index.html" -exec dirname {} \; | head -n 1)
-              cp -r "$SOURCE_DIR"/* www/
+              cp -r "$SOURCE_DIR"/* staging_dir/
             fi
+            rm -rf temp_unzip
           elif [ -f index.html ]; then
-            cp -r * www/ 2>/dev/null || true
-            cp index.html www/
+            cp index.html staging_dir/
+            cp -r *.css *.js *.ttf *.otf staging_dir/ 2>/dev/null || true
           fi
+          rm -rf www
+          mv staging_dir www
 
-      # نصب Capacitor و ایجاد ساختار پروژه اندروید
       - name: Initialize Capacitor & Android Project
         run: |
           npm init -y
@@ -51,7 +51,7 @@ jobs:
           npx cap init "ClassicalGuitar" "com.guitar.classical" --web-dir www
           npx cap add android
 
-          # رفع تداخل نسخه‌های کاتلین در زمان بیلد
+          # یکدست‌سازی نسخه‌های کاتلین
           cat << 'EOF' >> android/app/build.gradle
 
           dependencies {
@@ -66,14 +66,12 @@ jobs:
           }
           EOF
 
-      # کامپایل فایل نصبی APK با گرادل
       - name: Build Debug APK with Gradle
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      # آپلود فایل نصبی برای دانلود
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
