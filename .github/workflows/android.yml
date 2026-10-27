@@ -24,25 +24,34 @@ jobs:
         with:
           node-version: '20'
 
-      # انتقال ایمن فایل‌ها بدون ایجاد لوپ در پوشه www
+      # استخراج و آماده‌سازی ایمن فایل‌ها
       - name: Prepare Web Assets
         run: |
-          mkdir -p staging_dir
+          rm -rf www temp_unzip
+          mkdir -p www
+
+          # ۱. اگر فایل زیپ در مخزن وجود دارد
           if ls *.zip 1> /dev/null 2>&1; then
-            unzip -o *.zip -d temp_unzip
-            if [ -f temp_unzip/index.html ]; then
-              cp -r temp_unzip/* staging_dir/
+            unzip -q -o *.zip -d temp_unzip
+            HTML_FILE=$(find temp_unzip -iname "index.html" | head -n 1)
+            
+            if [ -n "$HTML_FILE" ]; then
+              HTML_DIR=$(dirname "$HTML_FILE")
+              cp -r "$HTML_DIR"/* www/
             else
-              SOURCE_DIR=$(find temp_unzip -name "index.html" -exec dirname {} \; | head -n 1)
-              cp -r "$SOURCE_DIR"/* staging_dir/
+              echo "خطا: فایل index.html درون فایل زیپ یافت نشد!"
+              exit 1
             fi
             rm -rf temp_unzip
-          elif [ -f index.html ]; then
-            cp index.html staging_dir/
-            cp -r *.css *.js *.ttf *.otf staging_dir/ 2>/dev/null || true
+
+          # ۲. اگر فایل index.html مستقیماً در صفحه اصلی مخزن قرار دارد
+          elif [ -f index.html ] || [ -f Index.html ]; then
+            cp [iI]ndex.html www/index.html
+            cp *.css *.js *.ttf *.otf www/ 2>/dev/null || true
+          else
+            echo "خطا: هیچ فایل وب یا زیپی در مخزن پیدا نشد!"
+            exit 1
           fi
-          rm -rf www
-          mv staging_dir www
 
       - name: Initialize Capacitor & Android Project
         run: |
